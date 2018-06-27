@@ -20,13 +20,12 @@ func (h *Head) Print(writer io.Writer) {
 
 func (h *Head) printRecursive(writer io.Writer, data []*Object, depth int) {
 	for i := range data {
-		if data[i].IsFlag() {
-			writer.Write([]byte(fmt.Sprint(strings.Repeat("\t", depth), "[", data[i].Type, "]\r\n")))
-		} else {
-			writer.Write([]byte(fmt.Sprint(strings.Repeat("\t", depth), "[", data[i].Type, ":", strings.Join(data[i].Values, ":"), "]\r\n")))
-		}
+		writer.Write([]byte(fmt.Sprint(strings.Repeat("\t", depth), data[i].String(), "\r\n")))
 		if data[i].Children != nil {
 			h.printRecursive(writer, data[i].Children, depth+1)
+		}
+		if depth == 0 {
+			writer.Write([]byte("\n\r"))
 		}
 	}
 }

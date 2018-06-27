@@ -6,12 +6,13 @@ import (
 	"io"
 	"regexp"
 
+	"bytes"
 	"strings"
 )
 
 var (
-	objectDefinitionRegex = regexp.MustCompile("\\[OBJECT:(.+)\\]")
-	objectRegex           = regexp.MustCompile("\\[(.*)\\]")
+	objectDefinitionRegex = regexp.MustCompile("\\[OBJECT:(.+?)\\]")
+	objectRegex           = regexp.MustCompile("\\[(.*?)\\]")
 )
 
 func Parse(stream io.Reader) (*Head, error) {
@@ -42,64 +43,81 @@ func Parse(stream io.Reader) (*Head, error) {
 		}
 	}
 
-	// parse objects
-	fill(reader, 0, &head.Objects, nil)
+	sections := sections(reader)
+	for i := range sections {
+		if section, err := buildSection(sections[i]); err == nil {
+			head.Objects = append(head.Objects, section)
+		}
+	}
 
 	return &head, nil
 }
 
-func fill(reader *bufio.Scanner, depth int, target *[]*Object, lastTarget *[]*Object) {
-	for reader.Scan() {
-		var lastObject *Object
-		if target != nil && *target != nil && len(*target) > 0 {
-			lastObject = (*target)[len(*target)-1]
+func sections(reader *bufio.Scanner) []string {
+	var sections []string
+
+	var cur string
+	for reader.Scan() && reader.Err() == nil {
+		if len(reader.Text()) == 0 || !objectRegex.MatchString(reader.Text()) {
+			continue
 		}
+		if len(cur) > 0 && strings.Count(reader.Text(), "\t") == 0 {
+			sections = append(sections, cur)
+			cur = ""
+		}
+		cur += reader.Text() + "\r\n"
+	}
 
-		if objectRegex.MatchString(reader.Text()) {
-			tabs := strings.Count(reader.Text(), "\t")
-			if tabs < depth {
-				if lastTarget != nil {
-					objects := objectRegex.FindAllStringSubmatch(reader.Text(), -1)
-					for i := range objects {
-						object := parseObject(objects[i][1])
-						if object == nil {
-							continue
-						}
+	return sections
+}
 
-						*lastTarget = append(*lastTarget, object)
-					}
-				}
-				return
-			} else if tabs > depth && target != nil {
-				if lastObject.Children == nil {
-					lastObject.Children = make([]*Object, 0)
-				}
+func buildSection(section string) (*Object, error) {
+	var base *Object
 
-				nextTarget := &lastObject.Children
-				objects := objectRegex.FindAllStringSubmatch(reader.Text(), -1)
-				for i := range objects {
-					object := parseObject(objects[i][1])
-					if object == nil {
-						continue
-					}
-
-					*nextTarget = append(*nextTarget, object)
-				}
-
-				fill(reader, depth+1, nextTarget, target)
+	reader := bufio.NewScanner(bytes.NewBufferString(section))
+	for reader.Scan() {
+		if scanned, err := buildObjectAndTraits(reader.Text()); err == nil {
+			if base == nil {
+				base = scanned
 			} else {
-				objects := objectRegex.FindAllStringSubmatch(reader.Text(), -1)
-				for i := range objects {
-					object := parseObject(objects[i][1])
-					if object == nil {
-						continue
-					}
+				depth := strings.Count(reader.Text(), "\t")
 
-					*target = append(*target, object)
+				target := base
+				for i := 0; i < depth; i++ {
+					if target.Children == nil || len(target.Children) == 0 {
+						break
+					}
+					target = target.Children[len(target.Children)-1]
 				}
+
+				target.Children = append(target.Children, scanned)
 			}
 		}
 	}
+
+	if base == nil {
+		return nil, fmt.Errorf("base object missing")
+	}
+
+	return base, nil
+}
+
+func buildObjectAndTraits(text string) (*Object, error) {
+	objects := objectRegex.FindAllStringSubmatch(text, -1)
+	if len(objects) == 0 {
+		return nil, fmt.Errorf("no object found")
+	}
+	object := parseObject(objects[0][1])
+	if len(objects) > 1 {
+		for i := 1; i < len(objects); i++ {
+			trait := parseObject(objects[i][1])
+			if trait == nil {
+				continue
+			}
+			object.Traits = append(object.Traits, trait)
+		}
+	}
+	return object, nil
 }
 
 func parseObject(content string) *Object {
