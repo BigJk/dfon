@@ -67,6 +67,7 @@ func sections(reader *bufio.Scanner) []string {
 		}
 		cur += reader.Text() + "\r\n"
 	}
+	sections = append(sections, cur)
 
 	return sections
 }
@@ -83,7 +84,7 @@ func buildSection(section string) (*Object, error) {
 				depth := strings.Count(reader.Text(), "\t")
 
 				target := base
-				for i := 0; i < depth; i++ {
+				for i := 0; i < depth-1; i++ {
 					if target.Children == nil || len(target.Children) == 0 {
 						break
 					}
