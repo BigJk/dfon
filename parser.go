@@ -2,18 +2,32 @@ package dfon
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"regexp"
 
 	"bytes"
+	"errors"
 	"strings"
 )
 
 var (
 	objectDefinitionRegex = regexp.MustCompile("\\[OBJECT:(.+?)\\]")
-	objectRegex           = regexp.MustCompile("\\[(.*?)\\]")
+	objectRegex           = regexp.MustCompile("[\\[(](.*?)[)\\]]")
+
+	ErrFilenameMissing   = errors.New("filename missing")
+	ErrDataEndedTooSoon  = errors.New("data ended too soon")
+	ErrNoCorrectObject   = errors.New("correct object definition not found")
+	ErrNoObjectFound     = errors.New("no object found")
+	ErrBaseObjectMissing = errors.New("base object missing")
 )
+
+func ParseBytes(data []byte) (*Head, error) {
+	return Parse(bytes.NewBuffer(data))
+}
+
+func ParseString(data string) (*Head, error) {
+	return Parse(bytes.NewBufferString(data))
+}
 
 func Parse(stream io.Reader) (*Head, error) {
 	reader := bufio.NewScanner(stream)
@@ -22,7 +36,7 @@ func Parse(stream io.Reader) (*Head, error) {
 
 	// parse filename
 	if !reader.Scan() {
-		return nil, fmt.Errorf("filename missing")
+		return nil, ErrFilenameMissing
 	}
 
 	head.Name = reader.Text()
@@ -31,18 +45,19 @@ func Parse(stream io.Reader) (*Head, error) {
 	// parse object definition
 	for {
 		if !reader.Scan() {
-			return nil, fmt.Errorf("data ended too soon")
+			return nil, ErrDataEndedTooSoon
 		}
 		if objectDefinitionRegex.MatchString(reader.Text()) {
 			matches := objectDefinitionRegex.FindStringSubmatch(reader.Text())
 			if len(matches) != 2 {
-				return nil, fmt.Errorf("correct object defintion not found")
+				return nil, ErrNoCorrectObject
 			}
 			head.Type = matches[1]
 			break
 		}
 	}
 
+	// extract sections and parse
 	sections := sections(reader)
 	for i := range sections {
 		if section, err := buildSection(sections[i]); err == nil {
@@ -97,7 +112,7 @@ func buildSection(section string) (*Object, error) {
 	}
 
 	if base == nil {
-		return nil, fmt.Errorf("base object missing")
+		return nil, ErrBaseObjectMissing
 	}
 
 	return base, nil
@@ -106,12 +121,12 @@ func buildSection(section string) (*Object, error) {
 func buildObjectAndTraits(text string) (*Object, error) {
 	objects := objectRegex.FindAllStringSubmatch(text, -1)
 	if len(objects) == 0 {
-		return nil, fmt.Errorf("no object found")
+		return nil, ErrNoObjectFound
 	}
-	object := parseObject(objects[0][1])
+	object := parseObject(objects[0][1], strings.HasPrefix(objects[0][0], "[") && strings.HasSuffix(objects[0][0], "]"))
 	if len(objects) > 1 {
 		for i := 1; i < len(objects); i++ {
-			trait := parseObject(objects[i][1])
+			trait := parseObject(objects[i][1], strings.HasPrefix(objects[i][0], "[") && strings.HasSuffix(objects[i][0], "]"))
 			if trait == nil {
 				continue
 			}
@@ -121,13 +136,14 @@ func buildObjectAndTraits(text string) (*Object, error) {
 	return object, nil
 }
 
-func parseObject(content string) *Object {
+func parseObject(content string, enabled bool) *Object {
 	values := strings.Split(content, ":")
 	if len(values) == 0 {
 		return nil
 	}
 
 	var newObject Object
+	newObject.Enabled = enabled
 	newObject.Type = values[0]
 	if len(values) > 1 {
 		newObject.Values = values[1:]

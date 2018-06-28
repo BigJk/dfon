@@ -6,6 +6,7 @@ import (
 )
 
 type Object struct {
+	Enabled  bool
 	Type     string
 	Values   []string
 	Children []*Object
@@ -18,15 +19,32 @@ func (o *Object) IsFlag() bool {
 
 func (o *Object) String() string {
 	buf := bytes.Buffer{}
-	buf.WriteString("[")
+	if o.Enabled {
+		buf.WriteString("[")
+	} else {
+		buf.WriteString("(")
+	}
 	buf.WriteString(o.Type)
 	if !o.IsFlag() {
 		buf.WriteString(":")
 		buf.WriteString(strings.Join(o.Values, ":"))
 	}
-	buf.WriteString("]")
+	if o.Enabled {
+		buf.WriteString("]")
+	} else {
+		buf.WriteString(")")
+	}
 	for i := range o.Traits {
 		buf.WriteString(o.Traits[i].String())
 	}
 	return buf.String()
+}
+
+func (o *Object) EnableState(state, traits bool) {
+	o.Enabled = state
+	if traits {
+		for i := range o.Traits {
+			o.Traits[i].Enabled = state
+		}
+	}
 }
