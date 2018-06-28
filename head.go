@@ -1,6 +1,7 @@
 package dfon
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -28,4 +29,10 @@ func (h *Head) printRecursive(writer io.Writer, data []*Object, depth int) {
 			writer.Write([]byte("\n\r"))
 		}
 	}
+}
+
+func (h *Head) String() string {
+	var buffer bytes.Buffer
+	h.Print(&buffer)
+	return buffer.String()
 }
