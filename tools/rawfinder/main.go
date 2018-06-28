@@ -59,6 +59,14 @@ func searchRecursive(data []*dfon.Object, parents []*dfon.Object, search *regexp
 			}
 			fmt.Println(data[i].Type)
 
+			if len(data[i].Traits) > 0 {
+				fmt.Print("| Traits:  ")
+				for j := range data[i].Traits {
+					fmt.Print(data[i].Traits[j])
+				}
+				fmt.Print("\n")
+			}
+
 			if len(data[i].Values) > 0 {
 				fmt.Println("| Values: ", strings.Join(data[i].Values, ", "))
 			}
