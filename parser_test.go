@@ -5,17 +5,18 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"os"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParse(t *testing.T) {
-	data, err := ioutil.ReadFile("./test_data/entity_default.txt")
-	if assert.NoError(t, err) {
-		head, err := Parse(bytes.NewBuffer(data))
-		if assert.NoError(t, err) {
-			head.Print(os.Stdout)
+	testFiles, err := ioutil.ReadDir("./test_data/")
+	if assert.NoError(t, err, "error while reading test directory") {
+		for i := range testFiles {
+			data, err := ioutil.ReadFile("./test_data/" + testFiles[i].Name())
+			if assert.NoError(t, err, "error while reading test file", testFiles[i].Name()) {
+				_, err := Parse(bytes.NewBuffer(data))
+				assert.NoError(t, err, "error while parsing")
+			}
 		}
 	}
 }
