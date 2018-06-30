@@ -22,7 +22,7 @@ func (o *Object) String() string {
 	if o.Enabled {
 		buf.WriteString("[")
 	} else {
-		buf.WriteString("(")
+		buf.WriteString("╳")
 	}
 	buf.WriteString(o.Type)
 	if !o.IsFlag() {
@@ -32,7 +32,7 @@ func (o *Object) String() string {
 	if o.Enabled {
 		buf.WriteString("]")
 	} else {
-		buf.WriteString(")")
+		buf.WriteString("╳")
 	}
 	for i := range o.Traits {
 		buf.WriteString(o.Traits[i].String())
