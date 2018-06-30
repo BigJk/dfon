@@ -19,10 +19,33 @@ func main() {
 	*search = strings.ToLower(*search)
 
 	if len(*search) == 0 {
-		panic("Please specify a text to search\nExample: rawfinde -search=\"SIEGE_POP\"")
+		panic("Please specify a text to search\nExample: rawfinder -search=\"SIEGE_POP\"")
 	}
 
-	err := filepath.Walk(*dir, func(path string, info os.FileInfo, err error) error {
+	// if path is file only parse the file
+	fi, err := os.Stat(*dir)
+	if err != nil {
+		panic(err)
+	}
+	switch mode := fi.Mode(); {
+	case mode.IsRegular():
+		file, err := os.Open(*dir)
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+
+		head, err := dfon.Parse(file)
+		if err != nil {
+			panic(err)
+		}
+
+		searchRecursive(head.Objects, make([]*dfon.Object, 0), regexp.MustCompile(*search), *dir)
+		return
+	}
+
+	// if directory walk all files
+	err = filepath.Walk(*dir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}

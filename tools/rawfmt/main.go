@@ -35,6 +35,8 @@ func main() {
 			var buf bytes.Buffer
 			head.Print(&buf)
 			ioutil.WriteFile(path, buf.Bytes(), 0777)
+
+			fmt.Println(path, "formated")
 		}
 		return nil
 	})
