@@ -11,13 +11,14 @@ import (
 )
 
 var (
+	filenameForbidden     = regexp.MustCompile("[^a-zA-Z_]")
 	objectDefinitionRegex = regexp.MustCompile("\\[OBJECT:(.+?)\\]")
-	objectRegex           = regexp.MustCompile("[\\[(](.*?)[)\\]]")
+	objectRegex           = regexp.MustCompile("[\\[╳](.*?)[╳\\]]")
 
-	ErrFilenameMissing   = errors.New("filename missing")
 	ErrDataEndedTooSoon  = errors.New("data ended too soon")
 	ErrNoCorrectObject   = errors.New("correct object definition not found")
 	ErrNoObjectFound     = errors.New("no object found")
+	ErrEmpty             = errors.New("empty")
 	ErrBaseObjectMissing = errors.New("base object missing")
 )
 
@@ -31,55 +32,76 @@ func ParseString(data string) (*Head, error) {
 
 func Parse(stream io.Reader) (*Head, error) {
 	reader := bufio.NewScanner(stream)
+	skipObjectDefinition := false
 
 	var head Head
 
-	// parse filename
+	// parse filename if existent
 	if !reader.Scan() {
-		return nil, ErrFilenameMissing
+		return nil, ErrDataEndedTooSoon
 	}
 
-	head.Name = reader.Text()
+	// check if filename is present and no comment
+	head.Name = strings.Trim(reader.Text(), " \t")
+	if len(head.Name) == 0 || filenameForbidden.MatchString(head.Name) || objectRegex.MatchString(head.Name) {
+		head.Name = ""
+		head.HasHeader = false
+		skipObjectDefinition = true
+	}
+
+	initial := false
 	head.Objects = make([]*Object, 0)
 
 	// parse object definition
-	for {
-		if !reader.Scan() {
-			return nil, ErrDataEndedTooSoon
-		}
-		if objectDefinitionRegex.MatchString(reader.Text()) {
-			matches := objectDefinitionRegex.FindStringSubmatch(reader.Text())
-			if len(matches) != 2 {
-				return nil, ErrNoCorrectObject
+	if !skipObjectDefinition {
+		for {
+			if !reader.Scan() {
+				return nil, ErrDataEndedTooSoon
 			}
-			head.Type = matches[1]
-			break
+			if objectDefinitionRegex.MatchString(reader.Text()) {
+				matches := objectDefinitionRegex.FindStringSubmatch(reader.Text())
+				if len(matches) != 2 {
+					return nil, ErrNoCorrectObject
+				}
+				head.Type = matches[1]
+				break
+			}
 		}
+	} else if objectRegex.MatchString(reader.Text()) {
+		initial = true
 	}
 
 	// extract sections and parse
-	sections := sections(reader)
+	sections := sections(reader, initial)
 	for i := range sections {
 		if section, err := buildSection(sections[i]); err == nil {
 			head.Objects = append(head.Objects, section)
 		}
 	}
 
+	if len(head.Objects) == 0 && len(head.Name) == 0 && len(head.Type) == 0 {
+		return nil, ErrEmpty
+	}
+
 	return &head, nil
 }
 
-func sections(reader *bufio.Scanner) []string {
+func sections(reader *bufio.Scanner, initial bool) []string {
 	var sections []string
 
 	var cur string
-	for reader.Scan() && reader.Err() == nil {
+	for initial || reader.Scan() && reader.Err() == nil {
+		initial = false
+
 		if len(reader.Text()) == 0 || !objectRegex.MatchString(reader.Text()) {
 			continue
 		}
+
 		if len(cur) > 0 && strings.Count(reader.Text(), "\t") == 0 {
 			sections = append(sections, cur)
 			cur = ""
 		}
+
 		cur += reader.Text() + "\r\n"
 	}
 	sections = append(sections, cur)

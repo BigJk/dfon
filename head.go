@@ -8,14 +8,17 @@ import (
 )
 
 type Head struct {
-	Name    string
-	Type    string
-	Objects []*Object
+	HasHeader bool
+	Name      string
+	Type      string
+	Objects   []*Object
 }
 
 func (h *Head) Print(writer io.Writer) {
-	writer.Write([]byte(h.Name + "\n\n"))
-	writer.Write([]byte("[OBJECT:" + h.Type + "]" + "\n\n"))
+	if h.HasHeader {
+		writer.Write([]byte(h.Name + "\n\n"))
+		writer.Write([]byte("[OBJECT:" + h.Type + "]" + "\n\n"))
+	}
 	h.printRecursive(writer, h.Objects, 0)
 }
 
@@ -25,7 +28,7 @@ func (h *Head) printRecursive(writer io.Writer, data []*Object, depth int) {
 		if data[i].Children != nil {
 			h.printRecursive(writer, data[i].Children, depth+1)
 		}
-		if depth == 0 {
+		if depth == 0 && h.HasHeader {
 			writer.Write([]byte("\n\r"))
 		}
 	}
