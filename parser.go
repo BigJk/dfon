@@ -35,6 +35,7 @@ func Parse(stream io.Reader) (*Head, error) {
 	skipObjectDefinition := false
 
 	var head Head
+	head.HasHeader = true
 
 	// parse filename if existent
 	if !reader.Scan() {
