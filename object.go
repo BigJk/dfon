@@ -2,15 +2,17 @@ package dfon
 
 import (
 	"bytes"
+	"fmt"
+	"strconv"
 	"strings"
 )
 
 type Object struct {
-	Enabled  bool
-	Type     string
-	Values   []string
-	Children []*Object
-	Traits   []*Object
+	Enabled  bool      `json:"enabled"`
+	Type     string    `json:"type"`
+	Values   []string  `json:"values"`
+	Children []*Object `json:"children"`
+	Traits   []*Object `json:"traits"`
 }
 
 func (o *Object) IsFlag() bool {
@@ -46,5 +48,46 @@ func (o *Object) EnableState(state, traits bool) {
 		for i := range o.Traits {
 			o.Traits[i].Enabled = state
 		}
+	}
+}
+
+func (o *Object) GetById(id string) []*Object {
+	return getById(id, o.Children)
+}
+
+func (o *Object) AsBool() bool {
+	if len(o.Values) > 0 && o.Values[0] == "YES" {
+		return true
+	}
+	return false
+}
+
+func (o *Object) SetBool(value bool) {
+	if len(o.Values) == 0 {
+		if value {
+			o.Values = []string{"YES"}
+		} else {
+			o.Values = []string{"NO"}
+		}
+	} else {
+		if value {
+			o.Values[0] = "YES"
+		} else {
+			o.Values[0] = "NO"
+		}
+	}
+}
+
+func (o *Object) AsInt(index int) int {
+	if index >= len(o.Values) {
+		return -1
+	}
+	n, _ := strconv.Atoi(o.Values[index])
+	return n
+}
+
+func (o *Object) SetInt(index int, value int) {
+	if index < len(o.Values) {
+		o.Values[index] = fmt.Sprint(value)
 	}
 }

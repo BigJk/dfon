@@ -8,10 +8,10 @@ import (
 )
 
 type Head struct {
-	HasHeader bool
-	Name      string
-	Type      string
-	Objects   []*Object
+	HasHeader bool      `json:"hasHeader"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	Objects   []*Object `json:"objects"`
 }
 
 func (h *Head) Print(writer io.Writer) {
@@ -38,4 +38,20 @@ func (h *Head) String() string {
 	var buffer bytes.Buffer
 	h.Print(&buffer)
 	return buffer.String()
+}
+
+func (h *Head) GetById(id string) []*Object {
+	return getById(id, h.Objects)
+}
+
+func getById(id string, objects []*Object) []*Object {
+	var found []*Object
+	for i := range objects {
+		if objects[i].Type == id {
+			found = append(found, objects[i])
+		}
+		found = append(found, getById(id, objects[i].Children)...)
+		found = append(found, getById(id, objects[i].Traits)...)
+	}
+	return found
 }
